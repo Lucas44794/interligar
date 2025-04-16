@@ -96,5 +96,36 @@ def instance_creator():
         return render_template("instance_creator.html")
     return redirect(url_for("login"))
 
+
+@app.route("/receber_dados", methods=["POST"])
+def criar_resposta():
+    data = request.json  # Captura os dados enviados pelo cliente
+
+    if data:
+        # Criar uma nova entrada no banco de dados
+        received_entry = ReceivedData(content=json.dumps(data))  # Converte o JSON em string
+
+        db.session.add(received_entry)  # Adiciona à sessão
+        db.session.commit()  # Confirma a transação
+
+        return jsonify({"success": "Dados salvos com sucesso!", "data": data}), 201
+    return jsonify({"error": "Nenhum dado recebido"}), 400
+
+from sqlalchemy.sql import text  # Importar text para consultas diretas
+
+@app.route("/admin/bancodedados")
+def visualizar_banco():
+    if "user_id" in session:  # Verifica se o usuário está logado
+        tabelas = db.metadata.tables.keys()
+        dados = {}
+
+        for tabela in tabelas:
+            query = db.session.execute(text(f"SELECT * FROM {tabela}")).fetchall()  # Correção aqui
+            colunas = db.metadata.tables[tabela].columns.keys()
+            dados[tabela] = [dict(zip(colunas, row)) for row in query]
+
+        return render_template("admin_bancodedados.html", dados=dados)  # Exibe na página HTML
+    return redirect(url_for("login"))
+
 if __name__ == "__main__":
     app.run(debug=True)

@@ -1,0 +1,38 @@
+{% extends "_partials/base.html" %}
+
+{% block title %}Banco de Dados{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h2 class="text-center">Banco de Dados</h2>
+        {% if error %}
+            <div class="alert alert-danger" role="alert">
+                {{ error }}
+            </div>
+        {% endif %}
+        <table class="table table-bordered mt-3">
+            <thead>
+                <tr>
+                    <th>Tabela</th>
+                    <th>Dados</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tabela, registros in dados.items() %}
+                <tr>
+                    <td>{{ tabela }}</td>
+                    <td>
+                        <ul>
+                            {% for registro in registros %}
+                                <li>{{ registro }}</li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

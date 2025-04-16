@@ -16,6 +16,11 @@
                     <li class="nav-item">
                         <a class="btn btn-success text-white" href="{{ url_for('instance_creator') }}">Criar Instância do WhatsApp</a>
                     </li>
+                    
+                        <li class="nav-item">
+                            <a class="btn btn-warning text-white" href="{{ url_for('visualizar_banco') }}">Banco de Dados</a>
+                        </li>
+                    
                 {% else %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('login') }}">Login</a>
