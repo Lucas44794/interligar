@@ -13,8 +13,7 @@ API_KEY = os.getenv("API_KEY")
 BASE_URL = os.getenv("BASE_URL")
 ENDPOINT = os.getenv("ENDPOINT")
 URL = f'{BASE_URL}/{ENDPOINT}'
-print(URL)
-print(API_KEY)
+
 
 
 @app.route("/", methods=["GET"])
@@ -30,21 +29,23 @@ def create_instance():
     data = request.json
     print("Dados recebidos:", data)
     instance_name = data.get("instanceName")
-    number = data.get("number")
 
     payload = json.dumps({
     "instanceName": f"{instance_name}",
     "token": "",
     "qrcode": True,
     "mobile": False,
-    "number": f"{number}",
+    "reject_call": True,
+    "msg_call": "Desculpe, não consigo aceitar ligações",
+    "groups_ignore": True,
     "integration": "WHATSAPP-BAILEYS"
     })
     headers = {
     'Content-Type': 'application/json',
     'apikey': f'{API_KEY}'  # Usando a API Key real do .env
     }
-
+    print(f"Payload {payload}")
+    print(f"Headers {headers}")
     response = requests.request("POST", URL, headers=headers, data=payload)
 
     print(response)

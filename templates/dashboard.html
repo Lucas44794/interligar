@@ -1,0 +1,9 @@
+{% extends "_partials/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h2>Bem-vindo, {{ username }}!</h2>
+<p>Este é seu painel personalizado.</p>
+<a href="{{ url_for('logout') }}" class="btn btn-danger">Sair</a>
+{% endblock %}

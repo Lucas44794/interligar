@@ -1,0 +1,45 @@
+/* Estilo padrão */
+.light-theme {
+    background-color: #ffffff;
+    color: #000000;
+}
+
+.dark-theme {
+    background-color: #121212;
+    color: #ffffff;
+}
+
+/* Estilos fixos para header e navbar */
+header {
+    background-color: #f8f9fa; /* Cor fixa */
+    color: #000; /* Cor fixa */
+}
+
+.navbar {
+    background-color: #f8f9fa; /* Cor fixa */
+    color: #000; /* Cor fixa */
+}
+
+.navbar-light .navbar-nav .nav-link {
+    color: #000; /* Cor fixa independente do tema */
+}
+
+.navbar-toggler-icon {
+    background-color: #000; /* Ícone fixo independente do tema */
+}
+
+/* Estilo para o botão "Sair" */
+.btn-logout {
+    color: #ffffff !important; /* Cor do texto */
+    background-color: #dc3545 !important; /* Vermelho padrão do Bootstrap */
+    border-radius: 5px; /* Deixe o botão com bordas arredondadas, opcional */
+    padding: 5px 10px; /* Espaçamento interno, opcional */
+    text-align: center;
+}
+
+/* Para o estado de "hover" (quando o mouse passa sobre o botão) */
+.btn-logout:hover {
+    background-color: #c82333 !important; /* Tom mais escuro de vermelho */
+    color: #ffffff !important; /* Garante que o texto permaneça branco */
+    text-decoration: none;
+}
