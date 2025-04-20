@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from flask_sqlalchemy import SQLAlchemy  # Para banco de dados
 import requests
 import json
@@ -153,6 +153,38 @@ def visualizar_banco():
         return render_template("admin_bancodedados.html", dados=dados)  # Exibe na página HTML
     return redirect(url_for("login"))
 
+
+
+@app.route("/register", methods=["GET", "POST"])
+def criar_usuario():
+    """
+    Rota para a criação de novos usuários.
+    """
+    if request.method == "POST":
+        # Obtém os dados do formulário
+        nickname = request.form.get("username")
+        senha = request.form.get("password")
+        role = request.form.get("role", "user").lower()
+        
+        if role not in ["admin", "user"]:  # Validação do papel
+            flash("Papel inválido. Escolha 'admin' ou 'user'.", "danger")
+            return redirect(url_for("criar_usuario"))
+        
+        with app.app_context():
+            # Verificar se o usuário já existe
+            existente = User.query.filter_by(username=nickname).first()
+            if existente:
+                flash(f"O usuário '{nickname}' já existe!", "danger")
+                return redirect(url_for("criar_usuario"))
+            
+            # Criar novo usuário
+            novo_usuario = User(username=nickname, password=senha, role=role)
+            db.session.add(novo_usuario)
+            db.session.commit()
+            flash(f"Usuário '{nickname}' criado com sucesso!", "success")
+            return redirect(url_for("login"))
+    
+    return render_template("register.html")
 
 if __name__ == "__main__":
     verificar_banco_de_dados()
