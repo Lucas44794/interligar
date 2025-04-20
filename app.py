@@ -5,15 +5,17 @@ import json
 from dotenv import load_dotenv
 import os
 from flask_migrate import Migrate
+from models import db, User, ReceivedData
+from flask_cors import CORS
 
 app = Flask(__name__)
-app.secret_key = "sua_chave_secreta"  # Necessário para a sessão
+app.secret_key = os.urandom(24)  # Gerar uma chave segura automaticamente
+CORS(app)  # Habilitar CORS
 
 # Configurar banco de dados SQLite
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-
+db.init_app(app)
 migrate = Migrate(app, db)
 
 # Carregar variáveis do .env
@@ -24,19 +26,23 @@ BASE_URL = os.getenv("BASE_URL")
 ENDPOINT = os.getenv("ENDPOINT")
 URL = f'{BASE_URL}/{ENDPOINT}'
 
-# Modelo de Usuário
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password = db.Column(db.String(120), nullable=False)
+
+def verificar_banco_de_dados():
+    """Verifica se o banco de dados existe e cria se necessário."""
+    if not os.path.exists("users.db"):
+        with app.app_context():
+            db.create_all()
+            print("Banco de dados criado com sucesso!")
+
 
 # Inicializar o banco de dados
 with app.app_context():
     db.create_all()
 
-# Página de login
+
 @app.route("/", methods=["GET", "POST"])
 def login():
+    """Página de login."""
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
@@ -50,55 +56,73 @@ def login():
             return render_template("login.html", error="Usuário ou senha incorretos.")
     return render_template("login.html")
 
-# Painel único do usuário
+
 @app.route("/dashboard", methods=["GET"])
 def user_dashboard():
+    """Painel único do usuário."""
     if "user_id" in session:
         user = User.query.get(session["user_id"])
         return render_template("dashboard.html", username=user.username)  # Exibe informações do usuário
     return redirect(url_for("login"))
 
-# Logout
+
 @app.route("/logout", methods=["GET"])
 def logout():
+    """Fazer logout do sistema."""
     session.pop("user_id", None)
     return redirect(url_for("login"))
 
-# Página de criação de instância (GET e POST)
-@app.route("/instance_creator", methods=["GET", "POST"])
-def instance_creator():
-    if "user_id" in session:  # Verifica se o usuário está logado
-        if request.method == "POST":
-            instance_name = request.form.get("instanceName")
-            number = request.form.get("number")
 
-            payload = {
-                "instanceName": instance_name,
-                "token": "",
-                "qrcode": True,
-                "mobile": False,
-                "number": number,
-                "integration": "WHATSAPP-BAILEYS"
-            }
-            headers = {
-                'Content-Type': 'application/json',
-                'apikey': f'{API_KEY}'  # Usando a API Key real do .env
-            }
+@app.route("/create-instance", methods=["GET", "POST"])
+def create_instance():
+    """
+    Rota para criar instâncias. Suporta envio de dados via formulário (GET) e JSON (POST).
+    """
+    if request.method == "POST":
+        # Aceita JSON ou dados enviados pelo formulário
+        data = request.json if request.json else request.form.to_dict()
 
-            response = requests.post(URL, headers=headers, json=payload)
+        instance_name = data.get("instanceName")
+        number = data.get("number")
 
-            if response.status_code == 201:
-                response_data = response.json()
-                return jsonify({"success": "Instância criada com sucesso!", "data": response_data})
-            else:
-                return jsonify({"error": response.text}), response.status_code
+        # Validar dados obrigatórios
+        if not instance_name or not number:
+            return jsonify({"error": "Nome da instância ou número está faltando."}), 400
 
-        return render_template("instance_creator.html")
-    return redirect(url_for("login"))
+        payload = {
+            "instanceName": instance_name,
+            "token": "",
+            "qrcode": True,
+            "mobile": False,
+            "number": number,
+            "integration": "WHATSAPP-BAILEYS",
+            "reject_call": True,
+            "msg_call": "Desculpe, não consigo aceitar ligações",
+            "groups_ignore": True
+        }
+
+        headers = {
+            'Content-Type': 'application/json',
+            'apikey': f'{API_KEY}'
+        }
+
+        response = requests.post(URL, headers=headers, json=payload)
+
+        if response.status_code == 201:
+            response_data = response.json()
+            qr_code_link = response_data.get("qr_code_link", None)
+            if qr_code_link:
+                return redirect(qr_code_link)  # Redireciona para a URL do QR Code
+            return jsonify({"success": "Conectado com Sucesso", "data": response_data})
+        else:
+            return jsonify({"error": response.text}), response.status_code
+
+    return render_template("instance_creator.html")
 
 
 @app.route("/receber_dados", methods=["POST"])
 def criar_resposta():
+    """Receber dados e salvar no banco de dados."""
     data = request.json  # Captura os dados enviados pelo cliente
 
     if data:
@@ -111,21 +135,23 @@ def criar_resposta():
         return jsonify({"success": "Dados salvos com sucesso!", "data": data}), 201
     return jsonify({"error": "Nenhum dado recebido"}), 400
 
-from sqlalchemy.sql import text  # Importar text para consultas diretas
 
 @app.route("/admin/bancodedados")
 def visualizar_banco():
+    """Rota para visualizar os dados do banco de dados."""
     if "user_id" in session:  # Verifica se o usuário está logado
         tabelas = db.metadata.tables.keys()
         dados = {}
 
         for tabela in tabelas:
-            query = db.session.execute(text(f"SELECT * FROM {tabela}")).fetchall()  # Correção aqui
+            query = db.session.execute(text(f"SELECT * FROM {tabela}")).fetchall()
             colunas = db.metadata.tables[tabela].columns.keys()
             dados[tabela] = [dict(zip(colunas, row)) for row in query]
 
         return render_template("admin_bancodedados.html", dados=dados)  # Exibe na página HTML
     return redirect(url_for("login"))
 
+
 if __name__ == "__main__":
-    app.run()
+    verificar_banco_de_dados()
+    app.run(debug=True)
