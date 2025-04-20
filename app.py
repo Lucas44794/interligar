@@ -7,6 +7,7 @@ import os
 from flask_migrate import Migrate
 from models import db, User, ReceivedData
 from flask_cors import CORS
+from sqlalchemy.sql import text
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Gerar uma chave segura automaticamente
@@ -20,7 +21,7 @@ migrate = Migrate(app, db)
 
 # Carregar variáveis do .env
 load_dotenv()
-
+webhookUrl = os.getenv("webhookUrl")
 API_KEY = os.getenv("API_KEY")
 BASE_URL = os.getenv("BASE_URL")
 ENDPOINT = os.getenv("ENDPOINT")
@@ -83,22 +84,23 @@ def create_instance():
         data = request.json if request.json else request.form.to_dict()
 
         instance_name = data.get("instanceName")
-        number = data.get("number")
-
-        # Validar dados obrigatórios
-        if not instance_name or not number:
-            return jsonify({"error": "Nome da instância ou número está faltando."}), 400
+        
 
         payload = {
             "instanceName": instance_name,
             "token": "",
             "qrcode": True,
             "mobile": False,
-            "number": number,
+            
             "integration": "WHATSAPP-BAILEYS",
             "reject_call": True,
             "msg_call": "Desculpe, não consigo aceitar ligações",
-            "groups_ignore": True
+            "groups_ignore": True,
+            "webhook": "{{webhookUrl}}",
+            "webhook_by_events": False,
+            "events": [
+                "QRCODE_UPDATED"
+                ]
         }
 
         headers = {
