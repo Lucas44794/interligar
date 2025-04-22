@@ -4,6 +4,11 @@ import requests
 import json
 from dotenv import load_dotenv
 import os
+import base64
+import os
+import time
+from PIL import Image
+from io import BytesIO
 from flask_migrate import Migrate
 from models import db, User, ReceivedData
 from flask_cors import CORS
@@ -142,14 +147,22 @@ def create_instance():
 
         if response.status_code == 201:
             response_data = response.json()
-            qr_code_link = response_data.get("qr_code_link", None)
+            qr_code_base64 = response_data.get("data", {}).get("qrcode", {}).get("base64")
 
             if webhook_url:
                 webhook_response = configurar_webhook(BASE_URL, API_KEY, instance_name, webhook_url)
                 response_data["webhook_setup"] = webhook_response
 
-            if qr_code_link:
-                return redirect(qr_code_link)  # Redireciona para a URL do QR Code
+            if qr_code_base64 and qr_code_base64.startswith("data:image/png;base64,"):
+                qr_code_base64 = qr_code_base64.replace("data:image/png;base64,", "")
+
+                # Criar a imagem temporária
+                nome_arquivo = "static/qrcode_temp.png"
+                criar_imagem(qr_code_base64, nome_arquivo)
+
+                return render_template("exibir_qrcode.html", qr_code=nome_arquivo)
+
+  # Redireciona para a URL do QR Code
             return jsonify({"success": "Conectado com Sucesso", "data": response_data})
         else:
             return jsonify({"error": response.text}), response.status_code
@@ -159,18 +172,53 @@ def create_instance():
 
 @app.route("/receber_dados", methods=["POST"])
 def criar_resposta():
-    """Receber dados e salvar no banco de dados."""
+    """Recebe dados e salva no banco de dados, gerando uma imagem se necessário."""
     data = request.json  # Captura os dados enviados pelo cliente
 
-    if data:
-        # Criar uma nova entrada no banco de dados
-        received_entry = ReceivedData(content=json.dumps(data))  # Converte o JSON em string
+    if not data:
+        return jsonify({"error": "Nenhum dado recebido"}), 400
 
-        db.session.add(received_entry)  # Adiciona à sessão
-        db.session.commit()  # Confirma a transação
+    # Verifica se o evento é "qrcode.updated"
+    if data.get("event") == "qrcode.updated":
+        # Obtém o base64 da imagem dentro do JSON
+        base64_str = data.get("data", {}).get("qrcode", {}).get("base64")
 
-        return jsonify({"success": "Dados salvos com sucesso!", "data": data}), 201
-    return jsonify({"error": "Nenhum dado recebido"}), 400
+        if base64_str and base64_str.startswith("data:image/png;base64,"):
+            base64_str = base64_str.replace("data:image/png;base64,", "")  # Remove o prefixo
+
+            # Cria a imagem
+            nome_arquivo = "qrcode_temp.png"
+            criar_imagem(base64_str, nome_arquivo)
+
+        else:
+            return jsonify({"error": "Base64 inválido ou ausente"}), 400
+
+    # Salva os dados no banco de dados
+    received_entry = ReceivedData(content=json.dumps(data))
+    db.session.add(received_entry)
+    db.session.commit()
+
+    return jsonify({"success": "Dados salvos com sucesso!", "data": data}), 201
+
+def criar_imagem(base64_str, nome_arquivo, tempo_expiracao=30):
+    """Cria uma imagem a partir do código base64 e a exclui após o tempo determinado."""
+    try:
+        img_data = base64.b64decode(base64_str)
+
+        # Criar a imagem
+        imagem = Image.open(BytesIO(img_data))
+        imagem.save(nome_arquivo)
+
+        print(f"Imagem salva como {nome_arquivo}. Será apagada em {tempo_expiracao} segundos.")
+
+        # Aguarda o tempo de expiração e exclui a imagem
+        time.sleep(tempo_expiracao)
+        os.remove(nome_arquivo)
+        print(f"Imagem {nome_arquivo} removida.")
+
+    except Exception as e:
+        print(f"Erro ao criar a imagem: {e}")
+
 
 
 @app.route("/admin/bancodedados")
