@@ -74,6 +74,40 @@ def logout():
     return redirect(url_for("login"))
 
 
+def configurar_webhook(api_url, api_key, instance_name, webhook_url):
+    """Função para configurar um webhook via API."""
+    
+    url = f"{api_url}/webhook/set/{instance_name}"
+    
+    headers = {
+        "Content-Type": "application/json",
+        "apikey": api_key
+    }
+    
+    data = {
+        "url": webhook_url,
+        "webhook_by_events": False,
+        "webhook_base64": False,
+        "events": [
+            "QRCODE_UPDATED",
+            "MESSAGES_UPSERT",
+            "MESSAGES_UPDATE",
+            "MESSAGES_DELETE",
+            "SEND_MESSAGE",
+            "CONNECTION_UPDATE",
+            "CALL"
+        ]
+    }
+    
+    response = requests.post(url, headers=headers, json=data)
+    
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {"error": response.text, "status_code": response.status_code}
+
+
+
 @app.route("/create-instance", methods=["GET", "POST"])
 def create_instance():
     """
@@ -84,23 +118,18 @@ def create_instance():
         data = request.json if request.json else request.form.to_dict()
 
         instance_name = data.get("instanceName")
+        token = instance_name + "+150"  
+        webhook_url = "https://sistema.lrcreator.com.br/receber_dados"
         
 
         payload = {
             "instanceName": instance_name,
-            "token": "",
+            "token": token,
             "qrcode": True,
-            "mobile": False,
-            
             "integration": "WHATSAPP-BAILEYS",
             "reject_call": True,
             "msg_call": "Desculpe, não consigo aceitar ligações",
             "groups_ignore": True,
-            "webhook": "{{webhookUrl}}",
-            "webhook_by_events": False,
-            "events": [
-                "QRCODE_UPDATED"
-                ]
         }
 
         headers = {
@@ -110,9 +139,15 @@ def create_instance():
 
         response = requests.post(URL, headers=headers, json=payload)
 
+
         if response.status_code == 201:
             response_data = response.json()
             qr_code_link = response_data.get("qr_code_link", None)
+
+            if webhook_url:
+                webhook_response = configurar_webhook(BASE_URL, API_KEY, instance_name, webhook_url)
+                response_data["webhook_setup"] = webhook_response
+
             if qr_code_link:
                 return redirect(qr_code_link)  # Redireciona para a URL do QR Code
             return jsonify({"success": "Conectado com Sucesso", "data": response_data})
